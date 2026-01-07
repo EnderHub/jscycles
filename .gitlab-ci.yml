@@ -1,0 +1,51 @@
+# GitLab CI configuration for Rust projects
+# Runs the full xtask CI pipeline on every push/MR
+
+stages:
+  - check
+
+variables:
+  CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
+  RUSTUP_HOME: ${CI_PROJECT_DIR}/.rustup
+
+# Cache cargo dependencies between runs
+cache:
+  key:
+    files:
+      - Cargo.lock
+  paths:
+    - .cargo/bin/
+    - .cargo/registry/index/
+    - .cargo/registry/cache/
+    - target/
+
+.rust-template: &rust-template
+  image: rust:1.92
+  before_script:
+    - rustup component add rustfmt clippy
+    - cargo install cargo-deny --locked || true
+    - cargo --version
+    - rustc --version
+    - clippy-driver --version
+
+# Main CI job - runs everything
+ci:
+  <<: *rust-template
+  stage: check
+  script:
+    - cargo xtask ci
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH
+
+# Optional: Run only fast checks on WIP branches
+lint:
+  <<: *rust-template
+  stage: check
+  script:
+    - cargo xtask fmt
+    - cargo xtask clippy
+  rules:
+    - if: $CI_COMMIT_BRANCH =~ /^wip\//
+  allow_failure: true

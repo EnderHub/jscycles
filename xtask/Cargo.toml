@@ -1,0 +1,19 @@
+[package]
+name = "xtask"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Build automation tasks for the workspace"
+publish = false
+
+[dependencies]
+xshell = "0.2"
+
+# xtask is a dev tool - use relaxed lints, not the strict workspace lints
+[lints.rust]
+unsafe-code = "forbid"
+
+[lints.clippy]
+all = "warn"
+pedantic = "warn"

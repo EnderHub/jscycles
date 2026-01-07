@@ -1,0 +1,40 @@
+# Cargo configuration
+# See: https://doc.rust-lang.org/cargo/reference/config.html
+
+[build]
+# Use all available CPUs for compilation
+jobs = -1
+
+[alias]
+# =============================================================================
+# XTASK COMMANDS - Primary interface for agents and developers
+# =============================================================================
+# Run `cargo xtask ci` before every commit/PR
+
+xtask = "run --package xtask --"
+
+# Convenience aliases for common xtask commands
+ci = "xtask ci"
+lint = "xtask clippy"
+
+# =============================================================================
+# QUICK SHORTCUTS
+# =============================================================================
+
+c = "check"
+b = "build"
+r = "run"
+t = "test"
+br = "build --release"
+rr = "run --release"
+tr = "test --release"
+
+# Format
+fmt-check = "fmt -- --check"
+
+# Clippy directly (prefer `cargo ci` for full checks)
+clip = "clippy --all-targets --all-features"
+
+[env]
+# Enable backtraces by default in development
+RUST_BACKTRACE = "1"

@@ -1,0 +1,214 @@
+# Clippy configuration - Maximum strictness
+# Compatible with Rust 1.85
+# See: https://doc.rust-lang.org/clippy/lint_configuration.html
+
+# ============================================================================
+# COMPLEXITY THRESHOLDS - Very strict limits
+# ============================================================================
+
+cognitive-complexity-threshold = 10
+excessive-nesting-threshold = 4
+too-many-arguments-threshold = 5
+too-many-lines-threshold = 50
+type-complexity-threshold = 100
+
+# ============================================================================
+# SIZE THRESHOLDS - Strict memory limits
+# ============================================================================
+
+trivial-copy-size-limit = 8
+pass-by-value-size-limit = 16
+large-error-threshold = 128
+stack-size-threshold = 512000
+future-size-threshold = 16384
+too-large-for-stack = 128
+vec-box-size-threshold = 4096
+unnecessary-box-size = 64
+array-size-threshold = 512000
+
+# ============================================================================
+# IDENTIFIER NAMING - Strict naming rules
+# ============================================================================
+
+min-ident-chars-threshold = 2
+allowed-idents-below-min-chars = ["i", "j", "k", "n", "x", "y", "z", "id", "ok", "Op", "to", "up", "s", "e", "f", "v", "r", "w", "c", "b", "p", "m", "t", "a", "d", "it"]
+allowed-prefixes = ["to", "as", "into", "from", "try", "is", "has", "with", "new", "get", "set"]
+disallowed-names = ["foo", "bar", "baz", "quux", "tmp", "temp"]
+single-char-binding-names-threshold = 4
+
+# ============================================================================
+# BOOLEAN PARAMETERS
+# ============================================================================
+
+max-struct-bools = 3
+max-fn-params-bools = 3
+
+# ============================================================================
+# STRUCT/ENUM THRESHOLDS
+# ============================================================================
+
+enum-variant-size-threshold = 200
+enum-variant-name-threshold = 3
+struct-field-name-threshold = 3
+
+# ============================================================================
+# TEST CONFIGURATION - Practical leniency for test ergonomics
+# ============================================================================
+
+allow-expect-in-tests = true
+allow-unwrap-in-tests = true
+allow-dbg-in-tests = false
+allow-print-in-tests = false
+allow-panic-in-tests = true
+allow-indexing-slicing-in-tests = false
+allow-useless-vec-in-tests = false
+allow-expect-in-consts = true
+allow-unwrap-in-consts = true
+check-incompatible-msrv-in-tests = true
+
+# ============================================================================
+# DOCUMENTATION REQUIREMENTS
+# ============================================================================
+
+missing-docs-in-crate-items = true
+missing-docs-allow-unused = false
+check-private-items = false
+lint-commented-code = true
+
+doc-valid-idents = [
+    "TL;DR", "GitHub", "GitLab", "BitBucket",
+    "JavaScript", "TypeScript", "CamelCase", "PascalCase",
+    "NaN", "NaNs", "OAuth", "GraphQL", "OpenGL", "WebGL",
+    "TensorFlow", "PyTorch", "NumPy", "DataFrame", "DevOps",
+    "SQLite", "PostgreSQL", "MySQL", "MongoDB", "Redis", "NoSQL",
+    "IPv4", "IPv6", "macOS", "iOS", "FreeBSD", "OpenBSD", "NetBSD",
+    "MinGW", "CentOS", "WebSocket", "WebAssembly", "OpenSSL", "LibreSSL",
+    "FFI", "API", "JSON", "XML", "HTML", "CSS", "HTTP", "HTTPS",
+    "URL", "URI", "UUID", "ASCII", "UTF-8", "UTF-16", "UTF-32",
+    "TOML", "YAML", "WASM", "CLI", "GUI", "TUI", "SDK",
+    "JIT", "AOT", "LLVM", "GCC", "MSVC", "ARM", "x86", "RISC-V",
+    "SIMD", "SSE", "AVX", "NEON",
+]
+
+# ============================================================================
+# SAFETY DOCUMENTATION
+# ============================================================================
+
+accept-comment-above-statement = true
+accept-comment-above-attributes = true
+
+# ============================================================================
+# SEMICOLON BEHAVIOR
+# ============================================================================
+
+semicolon-inside-block-ignore-singleline = false
+semicolon-outside-block-ignore-multiline = false
+
+# ============================================================================
+# IMPORTS AND PATHS
+# ============================================================================
+
+warn-on-all-wildcard-imports = true
+allowed-wildcard-imports = []
+allow-mixed-uninlined-format-args = false
+absolute-paths-allowed-crates = []
+absolute-paths-max-segments = 2
+enforced-import-renames = []
+
+# ============================================================================
+# LITERAL REPRESENTATION
+# ============================================================================
+
+literal-representation-threshold = 5
+const-literal-digits-threshold = 5
+allow-one-hash-in-raw-strings = false
+unreadable-literal-lint-fractions = true
+
+# ============================================================================
+# ASYNC/AWAIT
+# ============================================================================
+
+await-holding-invalid-types = [
+    { path = "std::sync::Mutex", reason = "Use tokio::sync::Mutex for async code" },
+    { path = "std::sync::MutexGuard", reason = "Holding a MutexGuard across await is a deadlock risk" },
+    { path = "std::sync::RwLock", reason = "Use tokio::sync::RwLock for async code" },
+    { path = "std::sync::RwLockReadGuard", reason = "Holding a RwLockReadGuard across await is a deadlock risk" },
+    { path = "std::sync::RwLockWriteGuard", reason = "Holding a RwLockWriteGuard across await is a deadlock risk" },
+    { path = "std::cell::Ref", reason = "Ref is not Send" },
+    { path = "std::cell::RefMut", reason = "RefMut is not Send" },
+]
+
+# ============================================================================
+# SCRIPTS AND UNICODE
+# ============================================================================
+
+allowed-scripts = ["Latin"]
+
+# ============================================================================
+# MACRO CONFIGURATION
+# ============================================================================
+
+standard-macro-braces = [
+    { name = "vec", brace = "[" },
+    { name = "format", brace = "(" },
+    { name = "print", brace = "(" },
+    { name = "println", brace = "(" },
+    { name = "eprint", brace = "(" },
+    { name = "eprintln", brace = "(" },
+    { name = "write", brace = "(" },
+    { name = "writeln", brace = "(" },
+    { name = "format_args", brace = "(" },
+    { name = "panic", brace = "(" },
+    { name = "todo", brace = "(" },
+    { name = "unimplemented", brace = "(" },
+    { name = "unreachable", brace = "(" },
+    { name = "assert", brace = "(" },
+    { name = "assert_eq", brace = "(" },
+    { name = "assert_ne", brace = "(" },
+    { name = "debug_assert", brace = "(" },
+    { name = "debug_assert_eq", brace = "(" },
+    { name = "debug_assert_ne", brace = "(" },
+]
+
+warn-unsafe-macro-metavars-in-private-macros = true
+
+# ============================================================================
+# DISALLOWED ITEMS - Ban specific items
+# ============================================================================
+
+disallowed-methods = []
+disallowed-types = []
+disallowed-macros = []
+
+# ============================================================================
+# CARGO CONFIGURATION
+# ============================================================================
+
+cargo-ignore-publish = false
+allowed-duplicate-crates = []
+allowed-dotfiles = [".gitignore", ".gitattributes", ".editorconfig", ".cargo"]
+
+# ============================================================================
+# MISC CONFIGURATION
+# ============================================================================
+
+msrv = "1.92"
+avoid-breaking-exported-api = false
+enable-raw-pointer-heuristic-for-send = true
+enforce-iter-loop-reborrow = true
+ignore-interior-mutability = ["bytes::Bytes"]
+max-trait-bounds = 3
+max-include-file-size = 1000000
+max-suggested-slice-pattern-length = 3
+matches-for-let-else = "WellKnownTypes"
+pub-underscore-fields-behavior = "PubliclyExported"
+upper-case-acronyms-aggressive = true
+verbose-bit-mask-threshold = 1
+suppress-restriction-lint-in-const = false
+allow-comparison-to-zero = true
+allow-private-module-inception = false
+allow-renamed-params-for = ["Default"]
+allow-exact-repetitions = false
+check-inconsistent-struct-field-initializers = true
+inherent-impl-lint-scope = "crate"
+recursive-self-in-type-definitions = true

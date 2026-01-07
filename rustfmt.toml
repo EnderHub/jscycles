@@ -1,0 +1,92 @@
+# Rustfmt configuration - Maximum strictness
+# See: https://rust-lang.github.io/rustfmt/
+
+edition = "2024"
+
+# Formatting width
+max_width = 100
+tab_spaces = 4
+hard_tabs = false
+
+# Use field init shorthand
+use_field_init_shorthand = true
+
+# Use try shorthand
+use_try_shorthand = true
+
+# Imports - stable option
+reorder_imports = true
+reorder_modules = true
+
+# Match arms
+match_arm_leading_pipes = "Never"
+match_block_trailing_comma = true
+
+# Array/Slices width limits
+array_width = 60
+attr_fn_like_width = 70
+chain_width = 60
+single_line_if_else_max_width = 50
+single_line_let_else_max_width = 50
+
+# Function parameters
+fn_params_layout = "Tall"
+
+# ============================================================================
+# UNSTABLE OPTIONS - Require nightly rustfmt
+# Uncomment these if using: rustup run nightly cargo fmt
+# ============================================================================
+
+# unstable_features = true
+
+# Formatting style
+# brace_style = "SameLineWhere"
+# control_brace_style = "AlwaysSameLine"
+# trailing_comma = "Vertical"
+# trailing_semicolon = true
+# binop_separator = "Front"
+# space_after_colon = true
+# space_before_colon = false
+# spaces_around_ranges = false
+# type_punctuation_density = "Wide"
+
+# Comments
+# format_code_in_doc_comments = true
+# doc_comment_code_block_width = 80
+# wrap_comments = true
+# comment_width = 100
+# normalize_comments = true
+# normalize_doc_attributes = true
+
+# Structs
+# struct_lit_single_line = false
+
+# Functions
+# fn_single_line = false
+
+# Where clauses
+# where_single_line = false
+# indent_style = "Block"
+
+# Blank lines
+# blank_lines_upper_bound = 1
+# blank_lines_lower_bound = 0
+
+# Imports (unstable)
+# imports_granularity = "Module"
+# group_imports = "StdExternalCrate"
+
+# Match arms (unstable)
+# match_arm_blocks = true
+
+# Hexadecimal literal formatting
+# hex_literal_case = "Upper"
+
+# Overflow behavior
+# overflow_delimited_expr = true
+
+# String formatting
+# format_strings = true
+# format_macro_matchers = true
+# format_macro_bodies = true
+# version = "Two"

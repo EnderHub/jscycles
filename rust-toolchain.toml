@@ -1,0 +1,7 @@
+# Rust toolchain configuration
+# See: https://rust-lang.github.io/rustup/overrides.html#the-toolchain-file
+
+[toolchain]
+channel = "1.92"
+components = ["rustfmt", "clippy", "rust-analyzer"]
+profile = "default"
