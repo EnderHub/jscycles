@@ -164,13 +164,26 @@ pub trait UnifiedOutputFormatter {
 pub struct HumanFormatter {
     /// Whether to use colors (for TTY output).
     pub use_color: bool,
+    /// Whether to show verbose output (including clean packages).
+    pub verbose: bool,
 }
 
 impl HumanFormatter {
     /// Create a new human formatter.
     #[inline]
     pub fn new(use_color: bool) -> Self {
-        Self { use_color }
+        Self {
+            use_color,
+            verbose: false,
+        }
+    }
+
+    /// Set verbose mode (show clean packages).
+    #[inline]
+    #[must_use]
+    pub fn with_verbose(mut self, verbose: bool) -> Self {
+        self.verbose = verbose;
+        self
     }
 
     /// Format a cycle path as a string.
@@ -189,15 +202,21 @@ impl HumanFormatter {
     }
 
     /// Format a single package result.
+    /// Returns Ok(true) if something was written, Ok(false) if skipped.
     fn format_package(
         &self,
         package: &PackageResult,
         writer: &mut dyn Write,
-    ) -> std::io::Result<()> {
+    ) -> std::io::Result<bool> {
         if package.cycles.is_empty() {
-            return self.format_clean_package(package, writer);
+            if self.verbose {
+                self.format_clean_package(package, writer)?;
+                return Ok(true);
+            }
+            return Ok(false);
         }
-        self.format_cyclic_package(package, writer)
+        self.format_cyclic_package(package, writer)?;
+        Ok(true)
     }
 
     /// Format a package with no cycles.
@@ -377,8 +396,10 @@ impl HumanFormatter {
         }
 
         for package in &results.file_results {
-            self.format_package(package, writer)?;
-            writeln!(writer)?;
+            let written = self.format_package(package, writer)?;
+            if written {
+                writeln!(writer)?;
+            }
         }
 
         Ok(())
@@ -421,8 +442,10 @@ impl OutputFormatter for HumanFormatter {
         }
 
         for package in &results.packages {
-            self.format_package(package, writer)?;
-            writeln!(writer)?;
+            let written = self.format_package(package, writer)?;
+            if written {
+                writeln!(writer)?;
+            }
         }
 
         Self::format_summary(results, writer)
@@ -941,7 +964,7 @@ mod tests {
 
     #[test]
     fn test_human_formatter_with_color() {
-        let formatter = HumanFormatter::new(true);
+        let formatter = HumanFormatter::new(true).with_verbose(true);
         let mut results = Results::new();
         results.packages.push(PackageResult {
             name: "@test/pkg".to_owned(),

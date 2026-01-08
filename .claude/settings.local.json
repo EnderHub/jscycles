@@ -5,7 +5,8 @@
       "Bash(cargo xtask:*)",
       "Bash(cargo fmt:*)",
       "Bash(cargo clippy:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(cargo build:*)"
     ]
   }
 }

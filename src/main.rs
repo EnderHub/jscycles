@@ -106,7 +106,7 @@ fn build_cli() -> Command {
             Arg::new("verbose")
                 .short('v')
                 .long("verbose")
-                .help("Show file-level details for inter-package cycles")
+                .help("Show all packages (including clean) and file-level details")
                 .action(ArgAction::SetTrue),
         )
 }
@@ -280,7 +280,7 @@ fn run(matches: &clap::ArgMatches) -> Result<bool, JscyclesError> {
         let formatter = JsonFormatter::new();
         formatter.format_unified(&unified, filter, &mut stdout)?;
     } else {
-        let formatter = HumanFormatter::new(use_color);
+        let formatter = HumanFormatter::new(use_color).with_verbose(verbose);
         formatter.format_unified(&unified, filter, &mut stdout)?;
     }
 
