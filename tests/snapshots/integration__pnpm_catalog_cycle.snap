@@ -1,0 +1,8 @@
+---
+source: tests/integration.rs
+assertion_line: 2181
+expression: cycles
+---
+[
+    "@catalog/app -> @catalog/lib -> @catalog/app",
+]

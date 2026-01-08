@@ -1,0 +1,8 @@
+---
+source: tests/integration.rs
+assertion_line: 1938
+expression: cycles
+---
+[
+    "src/hub.ts → src/spoke1.ts → src/hub.ts",
+]

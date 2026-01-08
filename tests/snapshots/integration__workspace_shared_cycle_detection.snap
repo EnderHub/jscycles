@@ -1,0 +1,8 @@
+---
+source: tests/integration.rs
+assertion_line: 1419
+expression: cycles
+---
+[
+    "@shared-cycle/app -> @shared-cycle/shared -> @shared-cycle/utils -> @shared-cycle/app",
+]

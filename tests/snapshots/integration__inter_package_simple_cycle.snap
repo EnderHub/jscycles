@@ -1,0 +1,8 @@
+---
+source: tests/integration.rs
+assertion_line: 318
+expression: cycles
+---
+[
+    "@simple/a -> @simple/b -> @simple/a",
+]

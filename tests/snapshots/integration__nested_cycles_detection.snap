@@ -1,0 +1,8 @@
+---
+source: tests/integration.rs
+assertion_line: 1252
+expression: cycles
+---
+[
+    "a.ts → b.ts → a.ts",
+]

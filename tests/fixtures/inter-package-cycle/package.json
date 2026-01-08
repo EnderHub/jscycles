@@ -1,0 +1,5 @@
+{
+  "name": "inter-package-cycle-root",
+  "private": true,
+  "workspaces": ["packages/*"]
+}

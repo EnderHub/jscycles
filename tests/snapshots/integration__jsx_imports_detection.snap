@@ -1,0 +1,8 @@
+---
+source: tests/integration.rs
+assertion_line: 2011
+expression: cycles
+---
+[
+    "src/App.tsx → src/Button.tsx → src/App.tsx",
+]

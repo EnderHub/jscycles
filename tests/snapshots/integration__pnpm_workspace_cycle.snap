@@ -1,0 +1,8 @@
+---
+source: tests/integration.rs
+assertion_line: 352
+expression: cycles
+---
+[
+    "@pnpm-test/a -> @pnpm-test/b -> @pnpm-test/a",
+]

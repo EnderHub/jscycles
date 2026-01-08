@@ -1,0 +1,8 @@
+---
+source: tests/integration.rs
+assertion_line: 1793
+expression: cycles
+---
+[
+    "src/main.ts → src/setup.ts → src/main.ts",
+]

@@ -1,0 +1,19 @@
+---
+source: tests/integration.rs
+assertion_line: 516
+expression: imports
+---
+[
+    (
+        "src/app/config.ts",
+        "@shared/helpers",
+    ),
+    (
+        "src/base/utils.ts",
+        "@app/config",
+    ),
+    (
+        "src/shared/helpers.ts",
+        "@base/utils",
+    ),
+]

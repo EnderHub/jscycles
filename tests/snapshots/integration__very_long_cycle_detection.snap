@@ -1,0 +1,8 @@
+---
+source: tests/integration.rs
+assertion_line: 1890
+expression: cycles
+---
+[
+    "src/m1.ts → src/m2.ts → src/m3.ts → src/m4.ts → src/m5.ts → src/m6.ts → src/m7.ts → src/m8.ts → src/m9.ts → src/m10.ts → src/m11.ts → src/m12.ts → src/m13.ts → src/m14.ts → src/m15.ts → src/m1.ts",
+]

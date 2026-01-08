@@ -1,0 +1,23 @@
+---
+source: tests/integration.rs
+assertion_line: 693
+expression: imports
+---
+[
+    (
+        "src/left.ts",
+        "./bottom",
+    ),
+    (
+        "src/right.ts",
+        "./bottom",
+    ),
+    (
+        "src/top.ts",
+        "./left",
+    ),
+    (
+        "src/top.ts",
+        "./right",
+    ),
+]

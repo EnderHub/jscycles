@@ -1,0 +1,8 @@
+---
+source: tests/integration.rs
+assertion_line: 1958
+expression: cycles
+---
+[
+    "src/even.ts → src/odd.ts → src/even.ts",
+]

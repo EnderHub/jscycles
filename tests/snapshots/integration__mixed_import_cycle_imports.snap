@@ -1,0 +1,19 @@
+---
+source: tests/integration.rs
+assertion_line: 1350
+expression: imports
+---
+[
+    (
+        "dynamic.ts",
+        "./require",
+    ),
+    (
+        "require.ts",
+        "./static",
+    ),
+    (
+        "static.ts",
+        "./dynamic",
+    ),
+]

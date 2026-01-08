@@ -1,0 +1,8 @@
+---
+source: tests/integration.rs
+assertion_line: 546
+expression: cycles
+---
+[
+    "@pnpm-complex/core -> @pnpm-complex/utils -> @pnpm-complex/core",
+]

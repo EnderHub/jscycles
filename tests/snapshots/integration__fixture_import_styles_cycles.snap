@@ -1,0 +1,8 @@
+---
+source: crates/jscycles/tests/integration.rs
+assertion_line: 193
+expression: cycles
+---
+[
+    "src/helper.ts → src/static-import.ts → src/helper.ts",
+]

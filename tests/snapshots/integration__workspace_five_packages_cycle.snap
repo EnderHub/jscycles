@@ -1,0 +1,8 @@
+---
+source: tests/integration.rs
+assertion_line: 2136
+expression: cycles
+---
+[
+    "@five/a -> @five/b -> @five/c -> @five/d -> @five/e -> @five/a",
+]

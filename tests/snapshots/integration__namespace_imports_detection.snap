@@ -1,0 +1,8 @@
+---
+source: tests/integration.rs
+assertion_line: 1861
+expression: cycles
+---
+[
+    "src/helpers.ts → src/utils.ts → src/helpers.ts",
+]

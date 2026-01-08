@@ -1,0 +1,19 @@
+---
+source: tests/integration.rs
+assertion_line: 523
+expression: imports
+---
+[
+    (
+        "src/helper.ts",
+        "@local/index",
+    ),
+    (
+        "src/index.ts",
+        "@company/util",
+    ),
+    (
+        "src/index.ts",
+        "@local/helper",
+    ),
+]

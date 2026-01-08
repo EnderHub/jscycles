@@ -1,0 +1,27 @@
+---
+source: crates/jscycles/tests/integration.rs
+assertion_line: 259
+expression: imports
+---
+[
+    (
+        "src/components/Button.ts",
+        "@utils/format",
+    ),
+    (
+        "src/index.ts",
+        "@/config",
+    ),
+    (
+        "src/index.ts",
+        "@components/Button",
+    ),
+    (
+        "src/index.ts",
+        "@utils/helper",
+    ),
+    (
+        "src/utils/helper.ts",
+        "@/index",
+    ),
+]

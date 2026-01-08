@@ -1,0 +1,8 @@
+---
+source: tests/integration.rs
+assertion_line: 509
+expression: cycles
+---
+[
+    "src/app/config.ts → src/shared/helpers.ts → src/base/utils.ts → src/app/config.ts",
+]

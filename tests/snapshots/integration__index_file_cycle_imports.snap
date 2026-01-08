@@ -1,0 +1,19 @@
+---
+source: tests/integration.rs
+assertion_line: 1292
+expression: imports
+---
+[
+    (
+        "index.ts",
+        "./moduleA",
+    ),
+    (
+        "index.ts",
+        "./moduleB",
+    ),
+    (
+        "moduleA.ts",
+        "./index",
+    ),
+]

@@ -1,0 +1,8 @@
+---
+source: tests/integration.rs
+assertion_line: 1281
+expression: cycles
+---
+[
+    "index.ts → moduleA.ts → index.ts",
+]

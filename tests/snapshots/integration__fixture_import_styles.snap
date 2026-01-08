@@ -1,0 +1,31 @@
+---
+source: crates/jscycles/tests/integration.rs
+assertion_line: 199
+expression: imports
+---
+[
+    (
+        "src/dynamic-import.ts",
+        "./helper",
+    ),
+    (
+        "src/helper.ts",
+        "./static-import",
+    ),
+    (
+        "src/reexport.ts",
+        "./helper",
+    ),
+    (
+        "src/reexport.ts",
+        "./utils",
+    ),
+    (
+        "src/require-call.ts",
+        "./helper",
+    ),
+    (
+        "src/static-import.ts",
+        "./helper",
+    ),
+]

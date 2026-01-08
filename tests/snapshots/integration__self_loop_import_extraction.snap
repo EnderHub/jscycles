@@ -1,0 +1,11 @@
+---
+source: tests/integration.rs
+assertion_line: 766
+expression: imports
+---
+[
+    (
+        "src/self.ts",
+        "./self",
+    ),
+]

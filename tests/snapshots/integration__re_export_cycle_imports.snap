@@ -1,0 +1,23 @@
+---
+source: tests/integration.rs
+assertion_line: 1267
+expression: imports
+---
+[
+    (
+        "index.ts",
+        "./main",
+    ),
+    (
+        "index.ts",
+        "./utils",
+    ),
+    (
+        "main.ts",
+        "./index",
+    ),
+    (
+        "utils.ts",
+        "./main",
+    ),
+]

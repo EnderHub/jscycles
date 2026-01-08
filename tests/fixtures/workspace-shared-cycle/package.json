@@ -1,0 +1,5 @@
+{
+  "name": "workspace-shared-cycle",
+  "private": true,
+  "workspaces": ["packages/*"]
+}

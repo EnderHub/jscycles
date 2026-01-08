@@ -1,0 +1,8 @@
+---
+source: crates/jscycles/tests/integration.rs
+assertion_line: 55
+expression: cycles
+---
+[
+    "src/a.ts → src/b.ts → src/a.ts",
+]

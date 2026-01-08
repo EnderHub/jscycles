@@ -1,0 +1,31 @@
+---
+source: tests/integration.rs
+assertion_line: 1715
+expression: imports
+---
+[
+    (
+        "src/entry1.ts",
+        "./shared",
+    ),
+    (
+        "src/entry1.ts",
+        "./util",
+    ),
+    (
+        "src/entry2.ts",
+        "./helper",
+    ),
+    (
+        "src/entry2.ts",
+        "./shared",
+    ),
+    (
+        "src/helper.ts",
+        "./entry2",
+    ),
+    (
+        "src/shared.ts",
+        "./entry1",
+    ),
+]

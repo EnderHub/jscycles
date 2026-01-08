@@ -1,0 +1,5 @@
+{
+  "name": "workspace-with-shared-dep",
+  "private": true,
+  "workspaces": ["packages/*"]
+}

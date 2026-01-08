@@ -1,0 +1,8 @@
+---
+source: tests/integration.rs
+assertion_line: 1303
+expression: cycles
+---
+[
+    "src/level1/a.ts → src/level1/level2/b.ts → src/level1/level2/level3/c.ts → src/level1/a.ts",
+]

@@ -1,0 +1,8 @@
+---
+source: tests/integration.rs
+assertion_line: 330
+expression: cycles
+---
+[
+    "@test/pkg-a -> @test/pkg-b -> @test/pkg-c -> @test/pkg-a",
+]

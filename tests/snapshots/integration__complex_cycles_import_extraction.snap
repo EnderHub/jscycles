@@ -1,0 +1,27 @@
+---
+source: tests/integration.rs
+assertion_line: 666
+expression: imports
+---
+[
+    (
+        "src/a.ts",
+        "./b",
+    ),
+    (
+        "src/b.ts",
+        "./c",
+    ),
+    (
+        "src/c.ts",
+        "./a",
+    ),
+    (
+        "src/d.ts",
+        "./e",
+    ),
+    (
+        "src/e.ts",
+        "./d",
+    ),
+]

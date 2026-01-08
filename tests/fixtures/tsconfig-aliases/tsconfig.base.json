@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "paths": {
+      "@alias-test/package-a": ["packages/pkg-a/src/index.ts"],
+      "@alias-test/package-b": ["packages/pkg-b/src/index.ts"],
+      "@alias-test/*": ["packages/*/src/index.ts"]
+    }
+  }
+}

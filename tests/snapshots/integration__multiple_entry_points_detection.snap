@@ -1,0 +1,9 @@
+---
+source: tests/integration.rs
+assertion_line: 1699
+expression: cycles
+---
+[
+    "src/entry1.ts → src/shared.ts → src/entry1.ts",
+    "src/entry2.ts → src/helper.ts → src/entry2.ts",
+]

@@ -31,7 +31,13 @@ array-size-threshold = 512000
 # ============================================================================
 
 min-ident-chars-threshold = 2
-allowed-idents-below-min-chars = ["i", "j", "k", "n", "x", "y", "z", "id", "ok", "Op", "to", "up", "s", "e", "f", "v", "r", "w", "c", "b", "p", "m", "t", "a", "d", "it"]
+# Extended list: common idiomatic single-char names in closures and iterators
+allowed-idents-below-min-chars = [
+    "i", "j", "k", "n", "x", "y", "z",     # loop/math indices
+    "s", "e", "f", "v", "r", "w",          # string, error, file, value, result, writer
+    "c", "b", "p", "m", "t", "a", "d",     # char, byte, path, map, type, accumulator, data
+    "id", "ok", "Op", "to", "up", "go", "Go", "C", "ch", "md", "it",
+]
 allowed-prefixes = ["to", "as", "into", "from", "try", "is", "has", "with", "new", "get", "set"]
 disallowed-names = ["foo", "bar", "baz", "quux", "tmp", "temp"]
 single-char-binding-names-threshold = 4
@@ -60,7 +66,7 @@ allow-unwrap-in-tests = true
 allow-dbg-in-tests = false
 allow-print-in-tests = false
 allow-panic-in-tests = true
-allow-indexing-slicing-in-tests = false
+allow-indexing-slicing-in-tests = true
 allow-useless-vec-in-tests = false
 allow-expect-in-consts = true
 allow-unwrap-in-consts = true
@@ -72,7 +78,7 @@ check-incompatible-msrv-in-tests = true
 
 missing-docs-in-crate-items = true
 missing-docs-allow-unused = false
-check-private-items = false
+check-private-items = false              # private item docs often trivial ceremony
 lint-commented-code = true
 
 doc-valid-idents = [

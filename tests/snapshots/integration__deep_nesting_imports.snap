@@ -1,0 +1,23 @@
+---
+source: tests/integration.rs
+assertion_line: 1314
+expression: imports
+---
+[
+    (
+        "src/index.ts",
+        "./level1/level2/level3/deep",
+    ),
+    (
+        "src/level1/a.ts",
+        "./level2/b",
+    ),
+    (
+        "src/level1/level2/b.ts",
+        "./level3/c",
+    ),
+    (
+        "src/level1/level2/level3/c.ts",
+        "../../a",
+    ),
+]

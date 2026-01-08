@@ -1,0 +1,8 @@
+---
+source: tests/integration.rs
+assertion_line: 1340
+expression: cycles
+---
+[
+    "dynamic.ts → require.ts → static.ts → dynamic.ts",
+]

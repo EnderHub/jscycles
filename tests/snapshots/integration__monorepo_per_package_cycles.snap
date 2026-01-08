@@ -1,0 +1,23 @@
+---
+source: crates/jscycles/tests/integration.rs
+assertion_line: 139
+expression: results
+---
+[
+    (
+        "@test/pkg-a",
+        [
+            "src/helper.ts → src/index.ts → src/helper.ts",
+        ],
+    ),
+    (
+        "@test/pkg-b",
+        [],
+    ),
+    (
+        "monorepo-root",
+        [
+            "packages/pkg-a/src/helper.ts → packages/pkg-a/src/index.ts → packages/pkg-a/src/helper.ts",
+        ],
+    ),
+]

@@ -85,11 +85,8 @@ skip = []
 # Skip checking entire dependency trees
 skip-tree = []
 
-[bans.build]
-# Allow build scripts for dependencies (surrealdb has many with build scripts)
-allow-build-scripts = ["*"]
-include-workspace = true
-include-dependencies = false
+# [bans.build] section removed - build scripts are allowed by default
+# The ast-grep dependencies have build scripts for tree-sitter parsers
 
 [sources]
 # Only allow crates from crates.io
