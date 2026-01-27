@@ -2,8 +2,10 @@ name: Release
 
 on:
   push:
+    branches: [main]
     tags:
       - "v*"
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -91,10 +93,22 @@ jobs:
         with:
           path: artifacts
 
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          echo "version=v$VERSION" >> $GITHUB_OUTPUT
+
+      - name: List artifacts
+        run: find artifacts -type f
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: ${{ steps.version.outputs.version }}
           generate_release_notes: true
+          make_latest: true
           files: |
             artifacts/jscycles-linux-x86_64/jscycles-linux-x86_64
             artifacts/jscycles-linux-aarch64/jscycles-linux-aarch64
