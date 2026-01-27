@@ -30,10 +30,6 @@ Tools like `madge` detect these cycles but become painfully slow on large monore
 cargo install --path .
 ```
 
-### Pre-built binaries
-
-Coming soon.
-
 ## Quick Start
 
 ```bash
@@ -315,7 +311,8 @@ Supported import syntaxes:
 - `import './module'` (side-effect imports)
 - `export { x } from './module'`
 - `export * from './module'`
-- Dynamic `import('./module')` (coming soon)
+- Dynamic `import('./module')`
+- `require('./module')` (CommonJS)
 
 ### What's considered a dependency
 
@@ -402,6 +399,14 @@ if workspace.is_some() {
 | Inter-package cycles | No | Yes |
 | Workspace detection | No | npm/pnpm/TypeScript |
 
+## Related Tools
+
+- **[madge](https://github.com/pahen/madge)** - Popular JavaScript dependency graph and circular dependency detector (see [comparison](#comparison-with-madge) above)
+- **[NX](https://nx.dev/features/enforce-module-boundaries)** - Monorepo build system with module boundary enforcement and circular dependency detection via ESLint rules
+- **[eslint-plugin-import](https://github.com/import-js/eslint-plugin-import)** - ESLint plugin with `no-cycle` rule for detecting circular dependencies inline during development
+- **[dpdm](https://github.com/acrazing/dpdm)** - JavaScript/TypeScript circular dependency detector with tree output
+- **[circular-dependency-plugin](https://github.com/aackerman/circular-dependency-plugin)** - Webpack plugin that detects cycles during bundling
+
 ## Troubleshooting
 
 ### "No packages found"
@@ -422,6 +427,15 @@ if workspace.is_some() {
 - Add patterns to `ignore` in package config
 - Use `--exclude` to skip problematic packages
 - Check for `export * from` re-exports that create apparent cycles
+
+## Development
+
+```bash
+# Run all checks (format, clippy, test, deny, doc)
+cargo xtask ci
+```
+
+See [CLAUDE.md](CLAUDE.md) for detailed development guidelines.
 
 ## License
 
