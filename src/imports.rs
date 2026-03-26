@@ -24,6 +24,16 @@ type ResolutionCache = Arc<Mutex<HashMap<PathBuf, Option<PathBuf>>>>;
 /// Type alias for ast-grep document type.
 type SgLang = StrDoc<SupportLang>;
 
+/// Controls which imports are extracted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ExtractionMode {
+    /// Extract and resolve all imports.
+    #[default]
+    All,
+    /// Only keep imports that target workspace packages.
+    WorkspaceOnly,
+}
+
 /// An extracted import statement.
 #[derive(Debug, Clone)]
 pub struct Import {
@@ -69,6 +79,9 @@ pub struct ImportExtractor {
     /// Workspace configuration for workspace package detection.
     workspace: Option<Workspace>,
 
+    /// Controls whether to resolve all imports or only workspace imports.
+    mode: ExtractionMode,
+
     /// Glob patterns for files to ignore.
     ignore_patterns: Vec<glob::Pattern>,
 
@@ -84,6 +97,7 @@ impl ImportExtractor {
             extensions,
             tsconfig,
             workspace: None,
+            mode: ExtractionMode::All,
             ignore_patterns: Vec::new(),
             resolution_cache: Arc::new(Mutex::new(HashMap::new())),
         }
@@ -94,6 +108,14 @@ impl ImportExtractor {
     #[must_use]
     pub fn with_workspace(mut self, workspace: Option<Workspace>) -> Self {
         self.workspace = workspace;
+        self
+    }
+
+    /// Set extraction mode.
+    #[inline]
+    #[must_use]
+    pub fn with_mode(mut self, mode: ExtractionMode) -> Self {
+        self.mode = mode;
         self
     }
 
@@ -157,6 +179,7 @@ impl ImportExtractor {
         if path_str.contains("node_modules")
             || path_str.ends_with("/dist")
             || path_str.ends_with("/build")
+            || path_str.ends_with("/.next")
             || path_str.contains("/.git/")
         {
             return true;
@@ -264,11 +287,39 @@ impl ImportExtractor {
             return None;
         }
 
+        if self.mode == ExtractionMode::WorkspaceOnly {
+            return self.create_workspace_import(&specifier, file_path);
+        }
+
         let target = self.resolve_import(file_path, &specifier);
         Some(Import {
             source: file_path.to_path_buf(),
             target,
             specifier,
+        })
+    }
+
+    /// Create an import only when it targets a workspace package.
+    fn create_workspace_import(&self, specifier: &str, file_path: &Path) -> Option<Import> {
+        if specifier.starts_with('.') || specifier.starts_with('/') {
+            return None;
+        }
+
+        let workspace = self.workspace.as_ref()?;
+        if !workspace.is_workspace_package(specifier) {
+            return None;
+        }
+
+        let package_name = workspace.resolve_package_name(specifier).to_owned();
+        let subpath = Workspace::extract_subpath(specifier).map(str::to_owned);
+
+        Some(Import {
+            source: file_path.to_path_buf(),
+            target: ImportTarget::WorkspacePackage {
+                package_name,
+                subpath,
+            },
+            specifier: specifier.to_owned(),
         })
     }
 
@@ -758,6 +809,43 @@ export * from './utils';";
                 } if package_name == "@myorg/utils" && sub == "deep/nested/path"
             ),
             "should extract deep nested subpath, got: {target:?}"
+        );
+    }
+
+    #[test]
+    fn test_workspace_only_mode_skips_non_workspace_imports() {
+        let workspace = create_test_workspace();
+        let extractor = ImportExtractor::new(vec!["ts".to_owned()], None)
+            .with_workspace(Some(workspace))
+            .with_mode(ExtractionMode::WorkspaceOnly);
+
+        let workspace_import = extractor.create_import_from_specifier_text(
+            "\"@myorg/shared/helpers\"",
+            Path::new("/app/index.ts"),
+        );
+        assert!(
+            matches!(
+                workspace_import.as_ref().map(|import| &import.target),
+                Some(ImportTarget::WorkspacePackage {
+                    package_name,
+                    subpath: Some(subpath),
+                }) if package_name == "@myorg/shared" && subpath == "helpers"
+            ),
+            "workspace-only mode should keep workspace imports, got: {workspace_import:?}"
+        );
+
+        let relative_import = extractor
+            .create_import_from_specifier_text("\"./local-helper\"", Path::new("/app/index.ts"));
+        assert!(
+            relative_import.is_none(),
+            "workspace-only mode should skip relative imports"
+        );
+
+        let external_import =
+            extractor.create_import_from_specifier_text("\"react\"", Path::new("/app/index.ts"));
+        assert!(
+            external_import.is_none(),
+            "workspace-only mode should skip external imports"
         );
     }
 

@@ -6,8 +6,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use glob::glob;
 use serde::Deserialize;
+use walkdir::WalkDir;
 
 use crate::WorkspaceError;
 
@@ -359,9 +359,27 @@ impl Workspace {
         patterns: &[String],
     ) -> Result<HashMap<String, PathBuf>, WorkspaceError> {
         let mut packages = HashMap::new();
+        let mut include_patterns = Vec::new();
+        let mut exclude_patterns = Vec::new();
 
         for pattern in patterns {
-            Self::expand_single_pattern(root, pattern, &mut packages)?;
+            let stripped = pattern.strip_prefix('!').unwrap_or(pattern);
+            let manifest_pattern = Self::manifest_pattern(stripped)?;
+            if pattern.starts_with('!') {
+                exclude_patterns.push(manifest_pattern);
+            } else {
+                include_patterns.push((stripped.to_owned(), manifest_pattern));
+            }
+        }
+
+        for (pattern, manifest_pattern) in include_patterns {
+            Self::expand_single_pattern(
+                root,
+                &pattern,
+                &manifest_pattern,
+                &exclude_patterns,
+                &mut packages,
+            )?;
         }
 
         Ok(packages)
@@ -371,28 +389,81 @@ impl Workspace {
     fn expand_single_pattern(
         root: &Path,
         pattern: &str,
+        manifest_pattern: &glob::Pattern,
+        exclude_patterns: &[glob::Pattern],
         packages: &mut HashMap<String, PathBuf>,
     ) -> Result<(), WorkspaceError> {
-        let full_pattern = root.join(pattern).join("package.json");
-        let pattern_str = full_pattern.to_string_lossy();
+        let search_root = root.join(Self::pattern_base(pattern));
+        if !search_root.exists() {
+            return Ok(());
+        }
 
-        let entries = glob(&pattern_str).map_err(|err| WorkspaceError::InvalidPattern {
-            pattern: pattern.to_owned(),
-            source: err,
-        })?;
-
-        for entry in entries.flatten() {
-            // Skip node_modules and dist directories
-            if Self::is_in_excluded_dir(&entry) {
+        for entry in WalkDir::new(search_root)
+            .follow_links(false)
+            .into_iter()
+            .filter_entry(|entry| !Self::is_in_excluded_dir(entry.path()))
+            .flatten()
+        {
+            if entry.file_type().is_dir() || entry.file_name() != "package.json" {
                 continue;
             }
 
-            if let Some((name, path)) = Self::read_package_name(&entry)? {
+            let Ok(relative_manifest) = entry.path().strip_prefix(root) else {
+                continue;
+            };
+            let relative_manifest = relative_manifest.to_string_lossy().replace('\\', "/");
+
+            if !manifest_pattern.matches(&relative_manifest)
+                || exclude_patterns
+                    .iter()
+                    .any(|exclude| exclude.matches(&relative_manifest))
+            {
+                continue;
+            }
+
+            if let Some((name, path)) = Self::read_package_name(entry.path())? {
                 let _ = packages.insert(name, path);
             }
         }
 
         Ok(())
+    }
+
+    /// Build a glob pattern that matches a package manifest path.
+    fn manifest_pattern(pattern: &str) -> Result<glob::Pattern, WorkspaceError> {
+        let manifest_pattern = format!("{}/package.json", pattern.trim_end_matches('/'));
+        glob::Pattern::new(&manifest_pattern).map_err(|source| WorkspaceError::InvalidPattern {
+            pattern: pattern.to_owned(),
+            source,
+        })
+    }
+
+    /// Extract the non-glob prefix of a workspace pattern.
+    fn pattern_base(pattern: &str) -> PathBuf {
+        let mut base = PathBuf::new();
+
+        for component in pattern.split('/') {
+            if component.is_empty() || Self::has_glob_chars(component) {
+                break;
+            }
+            base.push(component);
+        }
+
+        if base.as_os_str().is_empty() {
+            PathBuf::from(".")
+        } else {
+            base
+        }
+    }
+
+    /// Check whether a pattern component contains glob metacharacters.
+    fn has_glob_chars(component: &str) -> bool {
+        component.contains('*')
+            || component.contains('?')
+            || component.contains('[')
+            || component.contains(']')
+            || component.contains('{')
+            || component.contains('}')
     }
 
     /// Check if a path is inside a node_modules or dist directory.
@@ -402,7 +473,11 @@ impl Workspace {
     fn is_in_excluded_dir(path: &Path) -> bool {
         path.components().any(|c| {
             if let std::path::Component::Normal(name) = c {
-                name == "node_modules" || name == "dist"
+                name == "node_modules"
+                    || name == "dist"
+                    || name == "build"
+                    || name == ".git"
+                    || name == ".next"
             } else {
                 false
             }
@@ -693,6 +768,9 @@ impl Workspace {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+
+    use tempfile::tempdir;
 
     #[test]
     fn test_extract_package_name_simple() {
@@ -1447,6 +1525,52 @@ mod tests {
         assert_eq!(
             direct_path, alias_path,
             "alias should resolve to same path as direct name"
+        );
+    }
+
+    #[test]
+    fn test_recursive_workspace_patterns_skip_excluded_dirs() {
+        let temp = tempdir().expect("tempdir should be created");
+        let root = temp.path();
+
+        let real_pkg = root.join("apps/real-app");
+        let ignored_pkg = root.join("apps/real-app/node_modules/fake-pkg");
+        let dist_pkg = root.join("apps/real-app/dist/generated-pkg");
+
+        fs::create_dir_all(&real_pkg).expect("real package dir should be created");
+        fs::create_dir_all(&ignored_pkg).expect("node_modules package dir should be created");
+        fs::create_dir_all(&dist_pkg).expect("dist package dir should be created");
+
+        fs::write(
+            real_pkg.join("package.json"),
+            r#"{ "name": "@demo/real-app" }"#,
+        )
+        .expect("real package manifest should be written");
+        fs::write(
+            ignored_pkg.join("package.json"),
+            r#"{ "name": "@demo/fake-pkg" }"#,
+        )
+        .expect("node_modules package manifest should be written");
+        fs::write(
+            dist_pkg.join("package.json"),
+            r#"{ "name": "@demo/generated-pkg" }"#,
+        )
+        .expect("dist package manifest should be written");
+
+        let packages = Workspace::expand_patterns(root, &[String::from("apps/**/*")])
+            .expect("workspace patterns should expand");
+
+        assert!(
+            packages.contains_key("@demo/real-app"),
+            "should include the real recursive workspace package"
+        );
+        assert!(
+            !packages.contains_key("@demo/fake-pkg"),
+            "should skip node_modules packages"
+        );
+        assert!(
+            !packages.contains_key("@demo/generated-pkg"),
+            "should skip dist packages"
         );
     }
 }

@@ -2,20 +2,23 @@
 //!
 //! A drop-in replacement for `madge --circular` with 50-100x performance improvement.
 
+use std::collections::{BTreeSet, HashMap};
 use std::io::{self, BufRead as _, IsTerminal as _, Write as _};
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::sync::Arc;
 
 use clap::{Arg, ArgAction, Command};
 use rayon::prelude::*;
+use serde::Deserialize;
 
 use jscycles::cycles::PackageCycleDetector;
 use jscycles::graph::PackageDependencyGraph;
-use jscycles::imports::Import;
+use jscycles::imports::{ExtractionMode, Import};
 use jscycles::output::{CycleFilter, UnifiedOutputFormatter as _, UnifiedResults};
 use jscycles::{
     Config, CycleDetector, DependencyGraph, HumanFormatter, ImportExtractor, JscyclesError,
-    JsonFormatter, Package, PackageDiscovery, PackageResult, TsConfig, Workspace,
+    JsonFormatter, Package, PackageDiscovery, PackageResult, TsConfig, TsConfigCache, Workspace,
 };
 
 /// Build the CLI command.
@@ -113,14 +116,19 @@ fn build_cli() -> Command {
 
 /// Options needed during package processing.
 struct ProcessOptions {
-    /// Path to tsconfig.json.
-    tsconfig: Option<PathBuf>,
+    /// Preloaded explicit tsconfig.json, if provided.
+    explicit_tsconfig: Option<TsConfig>,
     /// Skip tsconfig.json auto-detection.
     no_tsconfig: bool,
     /// File extensions to analyze.
     extensions: Vec<String>,
     /// Workspace configuration for inter-package cycle detection.
     workspace: Option<Workspace>,
+    /// Shared tsconfig discovery/load cache.
+    tsconfig_cache: Arc<TsConfigCache>,
+
+    /// How much work to do while processing each package.
+    mode: ProcessMode,
 }
 
 /// Result of processing a package (includes imports for package graph).
@@ -129,6 +137,31 @@ struct ProcessedPackage {
     result: PackageResult,
     /// All imports from this package (for building package graph).
     imports: Vec<Import>,
+}
+
+/// Minimal package.json dependency sections for package-level cycle detection.
+#[derive(Debug, Default, Deserialize)]
+struct PackageManifest {
+    /// Runtime dependencies.
+    dependencies: Option<HashMap<String, String>>,
+    /// Development dependencies.
+    #[serde(rename = "devDependencies")]
+    dev_dependencies: Option<HashMap<String, String>>,
+    /// Peer dependencies.
+    #[serde(rename = "peerDependencies")]
+    peer_dependencies: Option<HashMap<String, String>>,
+    /// Optional dependencies.
+    #[serde(rename = "optionalDependencies")]
+    optional_dependencies: Option<HashMap<String, String>>,
+}
+
+/// Controls how much package processing is required for a given CLI mode.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ProcessMode {
+    /// Full import extraction plus file-level cycle detection.
+    Full,
+    /// Only collect workspace-package imports for package-level cycles.
+    WorkspaceOnly,
 }
 
 /// Run the cycle detection.
@@ -204,25 +237,51 @@ fn run(matches: &clap::ArgMatches) -> Result<bool, JscyclesError> {
 
     // Discover workspace from scan paths (not current directory)
     // This allows detecting workspaces when scanning external directories
-    let workspace_root = scan_paths.first().map_or_else(
-        || PathBuf::from("."),
-        |p| {
-            // Canonicalize to get absolute path, fall back to the path itself
-            p.canonicalize().unwrap_or_else(|_| p.clone())
-        },
-    );
-    let workspace = Workspace::discover(&workspace_root)?;
+    let workspace = if filter == CycleFilter::Inner {
+        None
+    } else {
+        let workspace_root = scan_paths.first().map_or_else(
+            || PathBuf::from("."),
+            |p| {
+                // Canonicalize to get absolute path, fall back to the path itself
+                p.canonicalize().unwrap_or_else(|_| p.clone())
+            },
+        );
+        Workspace::discover(&workspace_root)?
+    };
+
+    let process_mode = if filter == CycleFilter::Outer && workspace.is_some() {
+        ProcessMode::WorkspaceOnly
+    } else {
+        ProcessMode::Full
+    };
+
+    let tsconfig_cache = Arc::new(TsConfigCache::new());
+    let explicit_tsconfig = if no_tsconfig || process_mode == ProcessMode::WorkspaceOnly {
+        None
+    } else {
+        tsconfig
+            .as_deref()
+            .and_then(|path| tsconfig_cache.load(path))
+    };
 
     // Create processing options
     let opts = ProcessOptions {
-        tsconfig,
+        explicit_tsconfig,
         no_tsconfig,
         extensions,
         workspace: workspace.clone(),
+        tsconfig_cache,
+        mode: process_mode,
     };
 
     // Discover packages
-    let packages = if !explicit_paths && !stdin_mode {
+    let packages = if process_mode == ProcessMode::WorkspaceOnly {
+        workspace
+            .as_ref()
+            .map(|ws| discovery.discover_workspace_packages(ws, &scan_paths))
+            .unwrap_or_default()
+    } else if !explicit_paths && !stdin_mode {
         discovery.discover(&PathBuf::from("."))?
     } else {
         discovery.discover_explicit(&scan_paths)?
@@ -236,7 +295,7 @@ fn run(matches: &clap::ArgMatches) -> Result<bool, JscyclesError> {
 
     // Build package dependency graph and detect package-level cycles
     let (package_cycles, package_cycles_with_files) = if workspace.is_some() {
-        let mut imports_by_package = std::collections::HashMap::new();
+        let mut imports_by_package = HashMap::new();
         for proc in &processed {
             let _ = imports_by_package.insert(proc.result.name.clone(), proc.imports.clone());
         }
@@ -295,12 +354,14 @@ fn process_package_with_imports(
     opts: &ProcessOptions,
 ) -> Result<ProcessedPackage, JscyclesError> {
     // Determine tsconfig
-    let tsconfig = if opts.no_tsconfig {
+    let tsconfig = if opts.mode == ProcessMode::WorkspaceOnly {
         None
-    } else if let Some(path) = &opts.tsconfig {
-        TsConfig::load(path).ok()
+    } else if opts.no_tsconfig {
+        None
+    } else if let Some(config) = &opts.explicit_tsconfig {
+        Some(config.clone())
     } else {
-        TsConfig::discover(&package.path)
+        opts.tsconfig_cache.discover(&package.path)
     };
 
     // Get extensions for this package
@@ -311,20 +372,36 @@ fn process_package_with_imports(
         .unwrap_or_else(|| opts.extensions.clone());
 
     // Create import extractor with workspace context
-    let mut extractor =
-        ImportExtractor::new(extensions, tsconfig).with_workspace(opts.workspace.clone());
+    let mut extractor = ImportExtractor::new(extensions, tsconfig)
+        .with_workspace(opts.workspace.clone())
+        .with_mode(match opts.mode {
+            ProcessMode::Full => ExtractionMode::All,
+            ProcessMode::WorkspaceOnly => ExtractionMode::WorkspaceOnly,
+        });
     if let Some(ignore) = &package.config.ignore {
         extractor = extractor.with_ignore_patterns(ignore.clone());
     }
 
     // Extract imports
-    let imports = extractor.extract(&package.path)?;
+    let imports = if opts.mode == ProcessMode::WorkspaceOnly {
+        match opts
+            .workspace
+            .as_ref()
+            .and_then(|workspace| collect_workspace_manifest_imports(package, workspace))
+        {
+            Some(manifest_imports) if !manifest_imports.is_empty() => manifest_imports,
+            _ => extractor.extract(&package.path)?,
+        }
+    } else {
+        extractor.extract(&package.path)?
+    };
 
-    // Build dependency graph
-    let graph = DependencyGraph::from_imports(&imports);
-
-    // Detect cycles
-    let cycles = CycleDetector::detect(&graph);
+    let cycles = if opts.mode == ProcessMode::WorkspaceOnly {
+        Vec::new()
+    } else {
+        let graph = DependencyGraph::from_imports(&imports);
+        CycleDetector::detect(&graph)
+    };
 
     let result = PackageResult {
         name: package.name.clone(),
@@ -333,6 +410,49 @@ fn process_package_with_imports(
     };
 
     Ok(ProcessedPackage { result, imports })
+}
+
+/// Read workspace-package edges from a package manifest.
+///
+/// Returns `None` if the package.json cannot be read or parsed, allowing
+/// callers to fall back to source-level import scanning.
+fn collect_workspace_manifest_imports(
+    package: &Package,
+    workspace: &Workspace,
+) -> Option<Vec<Import>> {
+    let package_json_path = package.path.join("package.json");
+    let contents = std::fs::read_to_string(&package_json_path).ok()?;
+    let manifest: PackageManifest = serde_json::from_str(&contents).ok()?;
+
+    let mut deps = BTreeSet::new();
+    for section in [
+        manifest.dependencies,
+        manifest.dev_dependencies,
+        manifest.peer_dependencies,
+        manifest.optional_dependencies,
+    ] {
+        let Some(entries) = section else {
+            continue;
+        };
+        for dependency in entries.into_keys() {
+            if workspace.is_workspace_package(&dependency) {
+                let _ = deps.insert(dependency);
+            }
+        }
+    }
+
+    Some(
+        deps.into_iter()
+            .map(|dependency| Import {
+                source: package_json_path.clone(),
+                target: jscycles::ImportTarget::WorkspacePackage {
+                    package_name: workspace.resolve_package_name(&dependency).to_owned(),
+                    subpath: None,
+                },
+                specifier: dependency,
+            })
+            .collect(),
+    )
 }
 
 fn main() -> ExitCode {
@@ -351,5 +471,64 @@ fn main() -> ExitCode {
             drop(writeln!(io::stderr(), "Error: {err}"));
             ExitCode::from(2)
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+    use std::fs;
+
+    use tempfile::tempdir;
+
+    use super::*;
+    use jscycles::workspace::WorkspaceFormat;
+
+    #[test]
+    fn test_collect_workspace_manifest_imports_uses_declared_dependencies() {
+        let temp = tempdir().expect("tempdir should be created");
+        let package_path = temp.path().join("pkg-a");
+        fs::create_dir_all(&package_path).expect("package dir should be created");
+        fs::write(
+            package_path.join("package.json"),
+            r#"{
+  "name": "@demo/a",
+  "dependencies": {
+    "@demo/b": "workspace:*",
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@demo/c": "workspace:*"
+  }
+}"#,
+        )
+        .expect("package.json should be written");
+
+        let package = Package {
+            name: "@demo/a".to_owned(),
+            path: package_path,
+            config: jscycles::config::PackageConfig::default(),
+        };
+
+        let mut packages = HashMap::new();
+        let _ = packages.insert("@demo/a".to_owned(), temp.path().join("pkg-a"));
+        let _ = packages.insert("@demo/b".to_owned(), temp.path().join("pkg-b"));
+        let _ = packages.insert("@demo/c".to_owned(), temp.path().join("pkg-c"));
+
+        let workspace = Workspace {
+            root: temp.path().to_path_buf(),
+            format: WorkspaceFormat::Npm,
+            packages,
+            aliases: HashMap::new(),
+        };
+
+        let imports = collect_workspace_manifest_imports(&package, &workspace)
+            .expect("manifest imports should be collected");
+
+        let specifiers: Vec<_> = imports
+            .iter()
+            .map(|import| import.specifier.as_str())
+            .collect();
+        assert_eq!(specifiers, vec!["@demo/b", "@demo/c"]);
     }
 }

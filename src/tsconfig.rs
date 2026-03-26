@@ -5,6 +5,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 use serde::Deserialize;
 
@@ -72,6 +73,15 @@ pub struct TsConfig {
 
     /// Compiled path alias patterns.
     pub paths: Vec<PathAlias>,
+}
+
+/// Shared cache for tsconfig discovery and loading.
+#[derive(Debug, Clone, Default)]
+pub struct TsConfigCache {
+    /// Memoized mapping from searched directories to discovered tsconfig paths.
+    dir_cache: Arc<Mutex<HashMap<PathBuf, Option<PathBuf>>>>,
+    /// Memoized parsed tsconfig contents keyed by file path.
+    config_cache: Arc<Mutex<HashMap<PathBuf, TsConfig>>>,
 }
 
 /// Maximum depth for tsconfig extends chain to prevent infinite loops.
@@ -342,9 +352,96 @@ impl TsConfig {
     }
 }
 
+impl TsConfigCache {
+    /// Create a new empty cache.
+    #[inline]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Discover a tsconfig for a path, caching both lookup results and parsed configs.
+    #[inline]
+    pub fn discover(&self, start: &Path) -> Option<TsConfig> {
+        let mut current = if start.is_file() {
+            start.parent().map(Path::to_path_buf)
+        } else {
+            Some(start.to_path_buf())
+        };
+        let mut visited = Vec::new();
+
+        while let Some(dir) = current {
+            if let Some(cached) = self.cached_dir_result(&dir) {
+                self.cache_dir_results(&visited, cached.as_deref());
+                return cached.and_then(|path| self.load_cached(&path));
+            }
+
+            let tsconfig_path = dir.join("tsconfig.json");
+            if tsconfig_path.exists() {
+                visited.push(dir);
+                self.cache_dir_results(&visited, Some(&tsconfig_path));
+                return self.load_cached(&tsconfig_path);
+            }
+
+            visited.push(dir.clone());
+            current = dir.parent().map(Path::to_path_buf);
+        }
+
+        self.cache_dir_results(&visited, None);
+        None
+    }
+
+    /// Load a specific tsconfig path using the parsed-config cache.
+    #[inline]
+    pub fn load(&self, path: &Path) -> Option<TsConfig> {
+        self.load_cached(path)
+    }
+
+    /// Get a cached directory lookup result, if any.
+    fn cached_dir_result(&self, dir: &Path) -> Option<Option<PathBuf>> {
+        self.dir_cache
+            .lock()
+            .unwrap_or_else(|err| err.into_inner())
+            .get(dir)
+            .cloned()
+    }
+
+    /// Cache discovery results for a list of visited directories.
+    fn cache_dir_results(&self, dirs: &[PathBuf], tsconfig_path: Option<&Path>) {
+        let value = tsconfig_path.map(Path::to_path_buf);
+        let mut cache = self.dir_cache.lock().unwrap_or_else(|err| err.into_inner());
+        for dir in dirs {
+            let _ = cache.insert(dir.clone(), value.clone());
+        }
+    }
+
+    /// Load a parsed tsconfig from cache or disk.
+    fn load_cached(&self, path: &Path) -> Option<TsConfig> {
+        if let Some(config) = self
+            .config_cache
+            .lock()
+            .unwrap_or_else(|err| err.into_inner())
+            .get(path)
+            .cloned()
+        {
+            return Some(config);
+        }
+
+        let config = TsConfig::load(path).ok()?;
+        let mut cache = self
+            .config_cache
+            .lock()
+            .unwrap_or_else(|err| err.into_inner());
+        let _ = cache.insert(path.to_path_buf(), config.clone());
+        Some(config)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+
+    use tempfile::tempdir;
 
     #[test]
     fn test_parse_tsconfig() {
@@ -866,5 +963,40 @@ mod tests {
             "should retain parent alias"
         );
         assert!(paths.contains_key("@child/*"), "should retain child alias");
+    }
+
+    #[test]
+    fn test_tsconfig_cache_discovers_shared_parent_config() {
+        let temp = tempdir().expect("tempdir should be created");
+        let root = temp.path();
+        fs::create_dir_all(root.join("packages/a/src")).expect("package a dirs should exist");
+        fs::create_dir_all(root.join("packages/b/src")).expect("package b dirs should exist");
+        fs::write(
+            root.join("tsconfig.json"),
+            r#"{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  }
+}"#,
+        )
+        .expect("tsconfig should be written");
+
+        let cache = TsConfigCache::new();
+        let first = cache.discover(&root.join("packages/a"));
+        let second = cache.discover(&root.join("packages/b"));
+
+        assert!(first.is_some(), "first lookup should find tsconfig");
+        assert!(
+            second.is_some(),
+            "second lookup should reuse cached discovery"
+        );
+        assert_eq!(
+            first.expect("checked above").base_url,
+            second.expect("checked above").base_url,
+            "cached lookups should return equivalent configs"
+        );
     }
 }

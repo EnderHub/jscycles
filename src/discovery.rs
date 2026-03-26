@@ -11,6 +11,7 @@ use walkdir::WalkDir;
 
 use crate::DiscoveryError;
 use crate::config::{Config, PackageConfig};
+use crate::workspace::Workspace;
 
 /// A discovered JavaScript/TypeScript package.
 #[derive(Debug, Clone)]
@@ -164,6 +165,33 @@ impl PackageDiscovery {
         Ok(packages)
     }
 
+    /// Discover packages from an already-expanded workspace package map.
+    ///
+    /// This avoids recursively scanning the filesystem a second time when
+    /// workspace discovery has already found the package roots.
+    #[inline]
+    pub fn discover_workspace_packages(
+        &self,
+        workspace: &Workspace,
+        scan_paths: &[PathBuf],
+    ) -> Vec<Package> {
+        let normalized_paths: Vec<_> = scan_paths
+            .iter()
+            .map(|path| Self::normalize_scan_path(path))
+            .collect();
+
+        let mut packages: Vec<_> = workspace
+            .packages
+            .iter()
+            .filter(|(_, path)| Self::matches_scan_paths(path, &normalized_paths))
+            .filter(|(name, _)| self.matches_filters(name))
+            .map(|(name, path)| self.build_package(name.clone(), path.clone()))
+            .collect();
+
+        packages.sort_by(|left, right| left.name.cmp(&right.name));
+        packages
+    }
+
     /// Discover packages from a single path.
     fn discover_from_path(
         &self,
@@ -225,6 +253,31 @@ impl PackageDiscovery {
         Ok(())
     }
 
+    /// Normalize a scan path for prefix matching against workspace package roots.
+    fn normalize_scan_path(path: &Path) -> PathBuf {
+        let base = if path.file_name().is_some_and(|name| name == "package.json") {
+            path.parent().unwrap_or(path)
+        } else {
+            path
+        };
+
+        if base.is_absolute() {
+            base.to_path_buf()
+        } else {
+            std::env::current_dir()
+                .map(|cwd| cwd.join(base))
+                .unwrap_or_else(|_| base.to_path_buf())
+        }
+    }
+
+    /// Check whether a package path falls under any requested scan path.
+    fn matches_scan_paths(package_path: &Path, scan_paths: &[PathBuf]) -> bool {
+        scan_paths.is_empty()
+            || scan_paths
+                .iter()
+                .any(|scan_path| package_path.starts_with(scan_path))
+    }
+
     /// Check if a directory should be excluded from scanning.
     fn should_exclude_dir(&self, path: &Path) -> bool {
         let path_str = path.to_string_lossy();
@@ -233,6 +286,7 @@ impl PackageDiscovery {
         if path_str.contains("node_modules")
             || path_str.ends_with("/dist")
             || path_str.ends_with("/build")
+            || path_str.ends_with("/.next")
         {
             return true;
         }
@@ -271,19 +325,22 @@ impl PackageDiscovery {
             .map(Path::to_path_buf)
             .unwrap_or_else(|| PathBuf::from("."));
 
-        // Find matching package config (sorted for determinism)
+        Ok(Some(self.build_package(name, package_dir)))
+    }
+
+    /// Build a package with config defaults applied.
+    fn build_package(&self, name: String, package_dir: PathBuf) -> Package {
         let mut config = self.find_package_config(&name);
 
-        // Set default extensions if not overridden
         if config.extensions.is_none() {
             config.extensions = Some(self.default_extensions.clone());
         }
 
-        Ok(Some(Package {
+        Package {
             name,
             path: package_dir,
             config,
-        }))
+        }
     }
 
     /// Find the matching package config for a package name.
@@ -330,6 +387,9 @@ impl PackageDiscovery {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
+
+    use crate::workspace::WorkspaceFormat;
 
     #[test]
     fn test_matches_filters_empty() {
@@ -355,5 +415,46 @@ mod tests {
             .expect("test discovery should be created successfully");
         assert!(discovery.matches_filters("@myorg/pkg"));
         assert!(!discovery.matches_filters("@myorg/pkg-legacy"));
+    }
+
+    #[test]
+    fn test_discover_workspace_packages_filters_by_scan_path() {
+        let config = Config::default();
+        let discovery = PackageDiscovery::new(&config, &[], &[])
+            .expect("test discovery should be created successfully");
+
+        let mut packages = HashMap::new();
+        let _ = packages.insert("@demo/app".to_owned(), PathBuf::from("/repo/apps/app"));
+        let _ = packages.insert("@demo/lib".to_owned(), PathBuf::from("/repo/libs/lib"));
+
+        let workspace = Workspace {
+            root: PathBuf::from("/repo"),
+            format: WorkspaceFormat::Pnpm,
+            packages,
+            aliases: HashMap::new(),
+        };
+
+        let packages =
+            discovery.discover_workspace_packages(&workspace, &[PathBuf::from("/repo/apps")]);
+
+        assert_eq!(
+            packages.len(),
+            1,
+            "should only include packages under scan path"
+        );
+        assert_eq!(packages[0].name, "@demo/app");
+        assert_eq!(packages[0].path, PathBuf::from("/repo/apps/app"));
+    }
+
+    #[test]
+    fn test_should_exclude_next_build_output() {
+        let config = Config::default();
+        let discovery = PackageDiscovery::new(&config, &[], &[])
+            .expect("test discovery should be created successfully");
+
+        assert!(
+            discovery.should_exclude_dir(Path::new("/repo/apps/auth/.next")),
+            ".next should be excluded from package discovery"
+        );
     }
 }

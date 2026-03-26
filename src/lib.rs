@@ -187,5 +187,5 @@ pub use output::{
     CycleFilter, HumanFormatter, JsonFormatter, OutputFormatter, PackageResult, Results,
     UnifiedOutputFormatter, UnifiedResults,
 };
-pub use tsconfig::TsConfig;
+pub use tsconfig::{TsConfig, TsConfigCache};
 pub use workspace::{Workspace, WorkspaceFormat};

@@ -216,6 +216,12 @@ license.workspace = true
 keywords = ["javascript", "typescript", "circular-dependencies", "static-analysis"]
 categories = ["development-tools", "command-line-utilities"]
 
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+
 [[bin]]
 name = "jscycles"
 path = "src/main.rs"
