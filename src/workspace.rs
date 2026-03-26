@@ -408,10 +408,10 @@ impl Workspace {
                 continue;
             }
 
-            let Ok(relative_manifest) = entry.path().strip_prefix(root) else {
+            let Ok(relative_manifest_path) = entry.path().strip_prefix(root) else {
                 continue;
             };
-            let relative_manifest = relative_manifest.to_string_lossy().replace('\\', "/");
+            let relative_manifest = relative_manifest_path.to_string_lossy().replace('\\', "/");
 
             if !manifest_pattern.matches(&relative_manifest)
                 || exclude_patterns
@@ -742,7 +742,7 @@ impl Workspace {
             specifier
         } else {
             // Return @scope/name (scope + '/' + name)
-            let end = scope_len + 1 + name_len;
+            let end = scope_len.saturating_add(1).saturating_add(name_len);
             specifier.get(..end).unwrap_or(specifier)
         }
     }

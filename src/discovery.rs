@@ -434,16 +434,16 @@ mod tests {
             aliases: HashMap::new(),
         };
 
-        let packages =
+        let discovered_packages =
             discovery.discover_workspace_packages(&workspace, &[PathBuf::from("/repo/apps")]);
 
         assert_eq!(
-            packages.len(),
+            discovered_packages.len(),
             1,
             "should only include packages under scan path"
         );
-        assert_eq!(packages[0].name, "@demo/app");
-        assert_eq!(packages[0].path, PathBuf::from("/repo/apps/app"));
+        assert_eq!(discovered_packages[0].name, "@demo/app");
+        assert_eq!(discovered_packages[0].path, PathBuf::from("/repo/apps/app"));
     }
 
     #[test]

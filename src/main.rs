@@ -354,9 +354,7 @@ fn process_package_with_imports(
     opts: &ProcessOptions,
 ) -> Result<ProcessedPackage, JscyclesError> {
     // Determine tsconfig
-    let tsconfig = if opts.mode == ProcessMode::WorkspaceOnly {
-        None
-    } else if opts.no_tsconfig {
+    let tsconfig = if opts.mode == ProcessMode::WorkspaceOnly || opts.no_tsconfig {
         None
     } else if let Some(config) = &opts.explicit_tsconfig {
         Some(config.clone())

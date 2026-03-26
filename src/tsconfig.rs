@@ -79,9 +79,18 @@ pub struct TsConfig {
 #[derive(Debug, Clone, Default)]
 pub struct TsConfigCache {
     /// Memoized mapping from searched directories to discovered tsconfig paths.
-    dir_cache: Arc<Mutex<HashMap<PathBuf, Option<PathBuf>>>>,
+    dir_cache: Arc<Mutex<HashMap<PathBuf, CachedDirResult>>>,
     /// Memoized parsed tsconfig contents keyed by file path.
     config_cache: Arc<Mutex<HashMap<PathBuf, TsConfig>>>,
+}
+
+/// Cached result for a tsconfig discovery lookup.
+#[derive(Debug, Clone)]
+enum CachedDirResult {
+    /// A tsconfig was found at this path.
+    Found(PathBuf),
+    /// No tsconfig exists for this directory or its parents.
+    Missing,
 }
 
 /// Maximum depth for tsconfig extends chain to prevent infinite loops.
@@ -152,7 +161,8 @@ impl TsConfig {
         };
 
         let parent_path = Self::resolve_extends_path(extends_path, tsconfig_dir)?;
-        Self::load_merged_options(&parent_path, depth + 1)
+        let next_depth = depth.checked_add(1).ok_or(TsConfigError::ExtendsDepth)?;
+        Self::load_merged_options(&parent_path, next_depth)
     }
 
     /// Resolve the extends path to an absolute path.
@@ -371,14 +381,18 @@ impl TsConfigCache {
 
         while let Some(dir) = current {
             if let Some(cached) = self.cached_dir_result(&dir) {
-                self.cache_dir_results(&visited, cached.as_deref());
-                return cached.and_then(|path| self.load_cached(&path));
+                self.cache_dir_results(&visited, Some(&cached));
+                let path = cached.path()?;
+                return self.load_cached(path);
             }
 
             let tsconfig_path = dir.join("tsconfig.json");
             if tsconfig_path.exists() {
                 visited.push(dir);
-                self.cache_dir_results(&visited, Some(&tsconfig_path));
+                self.cache_dir_results(
+                    &visited,
+                    Some(&CachedDirResult::Found(tsconfig_path.clone())),
+                );
                 return self.load_cached(&tsconfig_path);
             }
 
@@ -386,7 +400,7 @@ impl TsConfigCache {
             current = dir.parent().map(Path::to_path_buf);
         }
 
-        self.cache_dir_results(&visited, None);
+        self.cache_dir_results(&visited, Some(&CachedDirResult::Missing));
         None
     }
 
@@ -397,7 +411,7 @@ impl TsConfigCache {
     }
 
     /// Get a cached directory lookup result, if any.
-    fn cached_dir_result(&self, dir: &Path) -> Option<Option<PathBuf>> {
+    fn cached_dir_result(&self, dir: &Path) -> Option<CachedDirResult> {
         self.dir_cache
             .lock()
             .unwrap_or_else(|err| err.into_inner())
@@ -406,8 +420,8 @@ impl TsConfigCache {
     }
 
     /// Cache discovery results for a list of visited directories.
-    fn cache_dir_results(&self, dirs: &[PathBuf], tsconfig_path: Option<&Path>) {
-        let value = tsconfig_path.map(Path::to_path_buf);
+    fn cache_dir_results(&self, dirs: &[PathBuf], result: Option<&CachedDirResult>) {
+        let value = result.cloned().unwrap_or(CachedDirResult::Missing);
         let mut cache = self.dir_cache.lock().unwrap_or_else(|err| err.into_inner());
         for dir in dirs {
             let _ = cache.insert(dir.clone(), value.clone());
@@ -416,23 +430,33 @@ impl TsConfigCache {
 
     /// Load a parsed tsconfig from cache or disk.
     fn load_cached(&self, path: &Path) -> Option<TsConfig> {
-        if let Some(config) = self
+        let cached_config = self
             .config_cache
             .lock()
             .unwrap_or_else(|err| err.into_inner())
             .get(path)
-            .cloned()
-        {
+            .cloned();
+        if let Some(config) = cached_config {
             return Some(config);
         }
 
         let config = TsConfig::load(path).ok()?;
-        let mut cache = self
+        let _ = self
             .config_cache
             .lock()
-            .unwrap_or_else(|err| err.into_inner());
-        let _ = cache.insert(path.to_path_buf(), config.clone());
+            .unwrap_or_else(|err| err.into_inner())
+            .insert(path.to_path_buf(), config.clone());
         Some(config)
+    }
+}
+
+impl CachedDirResult {
+    /// Get the discovered path, if one exists.
+    fn path(&self) -> Option<&Path> {
+        match self {
+            Self::Found(path) => Some(path.as_path()),
+            Self::Missing => None,
+        }
     }
 }
 
