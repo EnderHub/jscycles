@@ -6,7 +6,13 @@
       "Bash(cargo fmt:*)",
       "Bash(cargo clippy:*)",
       "Bash(grep:*)",
-      "Bash(cargo build:*)"
+      "Bash(cargo build:*)",
+      "mcp__ender-db__enderdb_info",
+      "mcp__ender-db__enderdb_lookup",
+      "mcp__ender-db__enderdb_index",
+      "mcp__ender-db__enderdb_doc",
+      "mcp__ender-db__enderdb_query",
+      "mcp__ender-db__enderdb_examples"
     ]
   }
 }
